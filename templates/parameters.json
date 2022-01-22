@@ -24,6 +24,12 @@
         },
         "appServiceName": {
             "value": "app-wordpress-pj"
+        },
+        "appServiceRepoUrl": {
+            "value": "https://github.com/p1johnson/wordpress-azure.git"
+        },
+        "appServiceRepoBranch": {
+            "value": "prune-plugins"
         }
     }
 }

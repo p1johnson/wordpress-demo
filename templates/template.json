@@ -119,6 +119,14 @@
         },
         "appServiceName": {
             "type": "string"
+        },
+        "appServiceRepoUrl": {
+            "type": "string",
+            "defaultValue": "https://github.com/azureappserviceoss/wordpress-azure"
+        },
+        "appServiceRepoBranch": {
+            "type": "string",
+            "defaultValue": "master"
         }
     },
     "functions": [],
@@ -218,6 +226,10 @@
                         {
                             "name": "PHPMYADMIN_EXTENSION_VERSION",
                             "value": "latest"
+                        },
+                        {
+                            "name": "PRUNE_PLUGINS",
+                            "value": ""
                         }
                     ],
                     "connectionStrings": [
@@ -242,8 +254,8 @@
                         "[resourceId('Microsoft.Web/Sites', parameters('appServiceName'))]"
                     ],
                     "properties": {
-                        "RepoUrl": "https://github.com/azureappserviceoss/wordpress-azure",
-                        "branch": "master",
+                        "RepoUrl": "[parameters('appServiceRepoUrl')]",
+                        "branch": "[parameters('appServiceRepoBranch')]",
                         "IsManualIntegration": true
                     }
                 }
