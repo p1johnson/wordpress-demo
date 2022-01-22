@@ -1,0 +1,29 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "value": "uksouth"
+        },
+        "mySqlServerName": {
+            "value": "mysql-wordpress-pj"
+        },
+        "mySqlAdministratorLogin": {
+            "value": "sqladmin"
+        },
+        "mySqlAdministratorPassword": {
+            "reference": {
+                "keyVault": {
+                    "id": "/subscriptions/13de6b5d-393e-40cb-82b6-fe9689d42f16/resourceGroups/Development/providers/Microsoft.KeyVault/vaults/pjdevkeys"
+                },
+                "secretName": "mySqlAdministratorPassword"
+            }
+        },
+        "appServicePlanName": {
+            "value": "plan-wordpress-pj"
+        },
+        "appServiceName": {
+            "value": "app-wordpress-pj"
+        }
+    }
+}

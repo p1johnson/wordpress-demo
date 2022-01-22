@@ -1,0 +1,254 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "type": "string"
+        },
+        "mySqlServerName": {
+            "type": "string"
+        },
+        "mySqlSkuName": {
+            "type": "string",
+            "defaultValue": "GP_Gen5_4"
+        },
+        "mySqlSkuTier": {
+            "type": "string",
+            "defaultValue": "GeneralPurpose"
+        },
+        "mySqlSkuCapacity": {
+            "type": "int",
+            "defaultValue": 4
+        },
+        "mySqlSkuSizeMB": {
+            "type": "int",
+            "defaultValue": 102400
+        },
+        "mySqlSkuFamily": {
+            "type": "string",
+            "defaultValue": "Gen5"
+        },
+        "mySqlInfrastructureEncryption": {
+            "type": "string",
+            "defaultValue": "Disabled",
+            "allowedValues": [
+                "Enabled",
+                "Disabled"
+            ]
+        },
+        "mySqlMinimalTlsVersion": {
+            "type": "string",
+            "defaultValue": "TLSEnforcementDisabled"
+        },
+        "mySqlPublicNetworkAccess": {
+            "type": "string",
+            "defaultValue": "Enabled",
+            "allowedValues": [
+                "Enabled",
+                "Disabled"
+            ]
+        },
+        "mySqlSslEnforcement": {
+            "type": "string",
+            "defaultValue": "Disabled",
+            "allowedValues": [
+                "Enabled",
+                "Disabled"
+            ]
+        },
+        "mySqlBackupRetentionDays": {
+            "type": "int",
+            "defaultValue": 7
+        },
+        "mySqlGeoRedundantBackup": {
+            "type": "string",
+            "defaultValue": "Disabled",
+            "allowedValues": [
+                "Enabled",
+                "Disabled"
+            ]
+        },
+        "mySqlStorageAutogrow": {
+            "type": "string",
+            "defaultValue": "Disabled",
+            "allowedValues": [
+                "Enabled",
+                "Disabled"
+            ]
+        },
+        "mySqlVersion": {
+            "type": "string",
+            "defaultValue": "5.7"
+        },
+        "mySqlAdministratorLogin": {
+            "type": "string"
+        },
+        "mySqlAdministratorPassword": {
+            "type": "securestring"
+        },
+        "mySqlDatabaseName": {
+            "type": "string",
+            "defaultValue": "wordpress"
+        },
+        "mySqlDatabaseCharset": {
+            "type": "string",
+            "defaultValue": "utf8"
+        },
+        "mySqlDatabaseCollation": {
+            "type": "string",
+            "defaultValue": "utf8_general_ci"
+        },
+        "appServicePlanName": {
+            "type": "string"
+        },
+        "appServicePlanSkuName": {
+            "type": "string",
+            "defaultValue": "P1v2"
+        },
+        "appServicePlanSkuTier": {
+            "type": "string",
+            "defaultValue": "PremiumV2"
+        },
+        "appServicePlanNumberOfWorkers": {
+            "type": "int",
+            "defaultValue": 1
+        },
+        "appServicePlanZoneRedundant": {
+            "type": "bool",
+            "defaultValue": false
+        },
+        "appServiceName": {
+            "type": "string"
+        }
+    },
+    "functions": [],
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.DBforMySQL/servers",
+            "apiVersion": "2017-12-01",
+            "name": "[parameters('mySqlServerName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "[parameters('mySqlSkuName')]",
+                "tier": "[parameters('mySqlSkuTier')]",
+                "capacity": "[parameters('MySqlSkuCapacity')]",
+                "size": "[parameters('MySqlSkuSizeMB')]",
+                "family": "[parameters('MySqlSkuFamily')]"
+            },
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "infrastructureEncryption": "[parameters('mySqlInfrastructureEncryption')]",
+                "minimalTlsVersion": "[parameters('mySqlMinimalTlsVersion')]",
+                "publicNetworkAccess": "[parameters('mySqlPublicNetworkAccess')]",
+                "sslEnforcement": "[parameters('mySqlSslEnforcement')]",
+                "storageProfile": {
+                    "backupRetentionDays": "[parameters('mySqlBackupRetentionDays')]",
+                    "geoRedundantBackup": "[parameters('mySqlGeoRedundantBackup')]",
+                    "storageAutogrow": "[parameters('mySqlStorageAutogrow')]",
+                    "storageMB": "[parameters('mySqlSkuSizeMB')]"
+                },
+                "version": "[parameters('mySqlVersion')]",
+                "createMode": "Default",
+                "administratorLogin": "[parameters('mySqlAdministratorLogin')]",
+                "administratorLoginPassword": "[parameters('mySqlAdministratorPassword')]"
+            },
+            "resources": [
+                {
+                    "dependsOn": [
+                        "[concat('Microsoft.DBforMySQL/servers/', parameters('mySqlServerName'))]"
+                    ],
+                    "type": "databases",
+                    "apiVersion": "2017-12-01",
+                    "name": "[parameters('mySqlDatabaseName')]",
+                    "properties": {
+                        "charset": "[parameters('mySqlDatabaseCharset')]",
+                        "collation": "[parameters('mySqlDatabaseCollation')]"
+                    }
+                },
+                {
+                    "name": "AllowAll",
+                    "type": "firewallrules",
+                    "apiVersion": "2017-12-01",
+                    "properties": {
+                        "startIpAddress": "0.0.0.0",
+                        "endIpAddress": "255.255.255.255"
+                    },
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.DBforMySQL/servers/', parameters('mySqlServerName'), '/databases/', parameters('mySqlDatabaseName'))]",
+                        "[concat('Microsoft.DBforMySQL/servers/', parameters('mySqlServerName'))]"
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2021-02-01",
+            "name": "[parameters('appServicePlanName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "[parameters('appServicePlanSkuName')]",
+                "tier": "[parameters('appServicePlanSkuTier')]"
+            },
+            "properties": {
+                "numberOfWorkers": "[parameters('appServicePlanNumberOfWorkers')]",
+                "zoneRedundant": "[parameters('appServicePlanZoneRedundant')]"
+            }
+        },
+        {
+            "apiVersion": "2018-11-01",
+            "name": "[parameters('appServiceName')]",
+            "type": "Microsoft.Web/sites",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Web/serverfarms/', parameters('appServicePlanName'))]",
+                "[concat('Microsoft.DBforMySQL/servers/', parameters('mySqlServerName'))]"
+            ],
+            "properties": {
+                "name": "[parameters('appServiceName')]",
+                "siteConfig": {
+                    "appSettings": [
+                        {
+                            "name": "DATABASE_HOST",
+                            "value": "P:DATABASEHOST: 3306"
+                        },
+                        {
+                            "name": "PHPMYADMIN_EXTENSION_VERSION",
+                            "value": "latest"
+                        }
+                    ],
+                    "connectionStrings": [
+                        {
+                            "name": "defaultConnection",
+                            "ConnectionString": "[concat('Database=',parameters('mySqlDatabaseName'),';Data Source=',parameters('mySqlServerName'),'.mysql.database.azure.com',';User Id=',parameters('mySqlAdministratorLogin'),'@',parameters('mySqlServerName'),';Password=',parameters('mySqlAdministratorPassword'))]",
+                            "type": "MySQL"
+                        }
+                    ],
+                    "phpVersion": "7.4",
+                    "netFrameworkVersion": "v4.0"
+                },
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms',parameters('appServicePlanName'))]",
+                "clientAffinityEnabled": true
+            },
+            "resources": [
+                {
+                    "apiVersion": "2020-12-01",
+                    "name": "web",
+                    "type": "sourcecontrols",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/Sites', parameters('appServiceName'))]"
+                    ],
+                    "properties": {
+                        "RepoUrl": "https://github.com/azureappserviceoss/wordpress-azure",
+                        "branch": "master",
+                        "IsManualIntegration": true
+                    }
+                }
+            ]
+        }
+    ],
+    "outputs": {}
+}
