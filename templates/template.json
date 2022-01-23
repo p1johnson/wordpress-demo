@@ -127,10 +127,40 @@
         "appServiceRepoBranch": {
             "type": "string",
             "defaultValue": "master"
+        },
+        "backupStorageAccountName": {
+            "type": "string"
+        },
+        "backupStorageContainerName": {
+            "type": "string",
+            "defaultValue": "wordpressbackup"
+        },
+        "frontDoorName": {
+            "type": "string"
+        },
+        "baseTime": {
+            "type": "string",
+            "defaultValue": "[utcNow('u')]"
         }
     },
     "functions": [],
-    "variables": {},
+    "variables": {
+        "backupStartTime": "[dateTimeAdd(concat(substring(parameters('baseTime'),0,13),':00:00'),'PT1H')]",
+        "serviceSasExpiry": "[dateTimeAdd(parameters('baseTime'),'P3Y')]",
+        "serviceSasProperties": {
+            "serviceStart": "[parameters('baseTime')]",
+            "signedExpiry": "[variables('serviceSasExpiry')]",
+            "signedResource": "c",
+            "signedPermission": "rwdl",
+            "canonicalizedResource": "[concat('/blob/',parameters('backupStorageAccountName'),'/',parameters('backupStorageContainerName'))]"
+        },
+        "frontDoorResourceId": "[resourceId('Microsoft.Network/frontdoors',parameters('frontDoorName'))]",
+        "frontDoorLoadBalancingSettingsId": "[concat(variables('frontDoorResourceId'),'/loadBalancingSettings/loadBalancingSettings-wordpress')]",
+        "frontDoorHealthProbeSettingsId": "[concat(variables('frontDoorResourceId'),'/healthProbeSettings/healthProbeSettings-wordpress')]",
+        "frontDoorFrontendEndpointId": "[concat(variables('frontDoorResourceId'),'/frontendEndpoints/',parameters('frontDoorName'))]",
+        "frontDoorBackendPoolId": "[concat(variables('frontDoorResourceId'),'/backendPools/',parameters('appServiceName'))]"
+
+    },
     "resources": [
         {
             "type": "Microsoft.DBforMySQL/servers",
@@ -260,6 +290,169 @@
                     }
                 }
             ]
+        },
+        {
+            "apiVersion": "2021-06-01",
+            "kind": "Storage",
+            "name": "[parameters('backupStorageAccountName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "location": "uksouth",
+            "sku": {
+                "name": "Standard_RAGRS",
+                "tier": "Standard"
+            },
+            "properties": {
+                "minimumTlsVersion": "TLS1_2",
+                "allowBlobPublicAccess": false,
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "virtualNetworkRules": [],
+                    "ipRules": [],
+                    "defaultAction": "Allow"
+                },
+                "supportsHttpsTrafficOnly": true
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+            "apiVersion": "2021-06-01",
+            "name": "[concat(parameters('backupStorageAccountName'),'/default/',parameters('backupStorageContainerName'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('backupStorageAccountName'))]"
+            ],
+            "properties": {
+                "publicAccess": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/config",
+            "apiVersion": "2021-02-01",
+            "name": "[concat(parameters('appServiceName'),'/backup')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites',parameters('appServiceName'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers',parameters('backupStorageAccountName'),'default',parameters('backupStorageContainerName'))]"
+            ],
+            "properties": {
+                "backupName": "[parameters('appServiceName')]",
+                "backupSchedule": {
+                    "frequencyInterval": 1,
+                    "frequencyUnit": "Hour",
+                    "keepAtLeastOneBackup": true,
+                    "retentionPeriodInDays": 30,
+                    "startTime": "[variables('backupStartTime')]"
+                },
+                "databases": [
+                    {
+                        "connectionString": "[concat('Database=',parameters('mySqlDatabaseName'),';Data Source=',parameters('mySqlServerName'),'.mysql.database.azure.com',';User Id=',parameters('mySqlAdministratorLogin'),'@',parameters('mySqlServerName'),';Password=',parameters('mySqlAdministratorPassword'))]",
+                        "connectionStringName": "defaultConnection",
+                        "databaseType": "MySql",
+                        "name": "defaultConnection"
+                    }
+                ],
+                "enabled": true,
+                "storageAccountUrl": "[concat(reference(resourceId('Microsoft.Storage/storageAccounts', parameters('backupStorageAccountName'))).primaryEndpoints.blob,parameters('backupStorageContainerName'),'?',listServiceSas(parameters('backupStorageAccountName'), '2021-04-01', variables('serviceSasProperties')).serviceSasToken)]"
+            }
+        },
+        {
+            "apiVersion": "2020-05-01",
+            "type": "Microsoft.Network/frontdoors",
+            "name": "[parameters('frontDoorName')]",
+            "location": "global",
+            "tags": {},
+            "properties": {
+                "friendlyName": "[parameters('frontDoorName')]",
+                "enabledState": "Enabled",
+                "healthProbeSettings": [
+                    {
+                        "name": "healthProbeSettings-wordpress",
+                        "properties": {
+                            "path": "/",
+                            "protocol": "Https",
+                            "intervalInSeconds": 30,
+                            "healthProbeMethod": "Head",
+                            "enabledState": "Enabled"
+                        }
+                    }
+                ],
+                "loadBalancingSettings": [
+                    {
+                        "name": "loadBalancingSettings-wordpress",
+                        "properties": {
+                            "sampleSize": 4,
+                            "successfulSamplesRequired": 2,
+                            "additionalLatencyMilliseconds": 0
+                        }
+                    }
+                ],
+                "frontendEndpoints": [
+                    {
+                        "name": "[parameters('frontDoorName')]",
+                        "properties": {
+                            "hostName": "[concat(parameters('frontDoorName'),'.azurefd.net')]",
+                            "sessionAffinityEnabledState": "Disabled"
+                        }
+                    }
+                ],
+                "backendPools": [
+                    {
+                        "name": "[parameters('appServiceName')]",
+                        "properties": {
+                            "backends": [
+                                {
+                                    "address": "[concat(parameters('appServiceName'),'.azurewebsites.net')]",
+                                    "enabledState": "Enabled",
+                                    "httpPort": 80,
+                                    "httpsPort": 443,
+                                    "priority": 1,
+                                    "weight": 50,
+                                    "backendHostHeader": "[concat(parameters('appServiceName'),'.azurewebsites.net')]"
+                                }
+                            ],
+                            "loadBalancingSettings": {
+                                "id": "[variables('frontDoorLoadBalancingSettingsId')]"
+                            },
+                            "healthProbeSettings": {
+                                "id": "[variables('frontDoorHealthProbeSettingsId')]"
+                            }
+                        }
+                    }
+                ],
+                "routingRules": [
+                    {
+                        "name": "wordpress",
+                        "properties": {
+                            "frontendEndpoints": [
+                                {
+                                    "id": "[variables('frontDoorFrontendEndpointId')]"
+                                }
+                            ],
+                            "acceptedProtocols": [
+                                "Http",
+                                "Https"
+                            ],
+                            "patternsToMatch": [
+                                "/*"
+                            ],
+                            "enabledState": "Enabled",
+                            "routeConfiguration": {
+                                "@odata.type": "#Microsoft.Azure.FrontDoor.Models.FrontdoorForwardingConfiguration",
+                                "forwardingProtocol": "HttpsOnly",
+                                "backendPool": {
+                                    "id": "[variables('frontDoorBackendPoolId')]"
+                                },
+                                "cacheConfiguration": {
+                                    "queryParameterStripDirective": "StripNone",
+                                    "dynamicCompression": "Enabled"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "backendPoolsSettings": {
+                    "enforceCertificateNameCheck": "Enabled",
+                    "sendRecvTimeoutSeconds": 30
+                }
+            }
         }
     ],
     "outputs": {}

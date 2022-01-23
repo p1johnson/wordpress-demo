@@ -30,6 +30,12 @@
         },
         "appServiceRepoBranch": {
             "value": "prune-plugins"
+        },
+        "backupStorageAccountName": {
+            "value": "stwordpressbackuppj"
+        },
+        "frontDoorName": {
+            "value": "fd-wordpress-pj"
         }
     }
 }
