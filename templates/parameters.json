@@ -11,14 +11,6 @@
         "mySqlAdministratorLogin": {
             "value": "sqladmin"
         },
-        "mySqlAdministratorPassword": {
-            "reference": {
-                "keyVault": {
-                    "id": "/subscriptions/13de6b5d-393e-40cb-82b6-fe9689d42f16/resourceGroups/Development/providers/Microsoft.KeyVault/vaults/pjdevkeys"
-                },
-                "secretName": "mySqlAdministratorPassword"
-            }
-        },
         "appServicePlanName": {
             "value": "plan-wordpress-pj"
         },
