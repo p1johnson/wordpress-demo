@@ -260,6 +260,10 @@
                         {
                             "name": "PRUNE_PLUGINS",
                             "value": ""
+                        },
+                        {
+                            "name": "FRONT_DOOR_HOST",
+                            "value": "[concat(parameters('frontDoorName'),'.azurefd.net')]"
                         }
                     ],
                     "connectionStrings": [

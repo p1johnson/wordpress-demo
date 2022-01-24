@@ -29,7 +29,7 @@
             "value": "https://github.com/p1johnson/wordpress-azure.git"
         },
         "appServiceRepoBranch": {
-            "value": "prune-plugins"
+            "value": "demo"
         },
         "backupStorageAccountName": {
             "value": "stwordpressbackuppj"
